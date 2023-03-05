@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>RoboLia README File</title>
   </head>
   <body>
     <a name="readme-top"></a>
