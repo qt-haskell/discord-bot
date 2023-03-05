@@ -32,7 +32,7 @@ from discord.ext import commands
 from redis.asyncio import Redis
 
 from utils import _RLC, RoboLiaContext
-from base import Gateway
+from base import Gateway, PostgreSQLManager
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -267,3 +267,6 @@ class RoboLia(commands.Bot):
                 self.logger.exception("Attempting a reconnect in %.2fs.", retry)
                 await asyncio.sleep(retry)
                 ws_params.update(sequence=self.ws.sequence, resume=True, session=self.ws.session_id)
+
+    async def connection(self, *, timeout: float = 10.0) -> PostgreSQLManager:
+        return PostgreSQLManager(self.pool, timeout=timeout)
