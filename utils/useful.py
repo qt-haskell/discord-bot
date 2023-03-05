@@ -38,7 +38,6 @@ __all__: tuple[str, ...] = (
     "humanize_seconds",
     "format_list",
     "humanize_timedelta",
-    "Cascade",
     "AppInfoCache",
     "suppress",
     "async_all",
@@ -89,126 +88,6 @@ def humanize_seconds(seconds: float) -> str:
 
 def humanize_timedelta(delta: timedelta) -> str:
     return humanize_seconds(delta.total_seconds())
-
-
-class Cascade(Generic[_T]):
-    def __init__(
-        self,
-        max_wait: float,
-        max_quantity: int,
-        async_callback: Callable[[Sequence[_T]], Awaitable],
-        *,
-        max_wait_finalize: int = 3,
-    ) -> None:
-        asyncio.get_running_loop()
-        self.queue: asyncio.Queue[_T] = asyncio.Queue()
-        self.max_wait: float = max_wait
-        self.max_wait_finalize: int = max_wait_finalize
-        self.max_quantity: int = max_quantity
-        self.callback: Callable[[Sequence[_T]], Awaitable] = async_callback
-        self.task: Optional[asyncio.Task] = None
-        self._alive: bool = False
-
-    def start(self) -> None:
-        if self.task is not None:
-            raise RuntimeError("Can't start a Cascade that's already running.")
-
-        self._alive = True
-        self.task = asyncio.create_task(self._loop())
-
-    @overload
-    def stop(self, wait: Literal[True]) -> Awaitable:
-        ...
-
-    @overload
-    def stop(self, wait: Literal[False]) -> None:
-        ...
-
-    @overload
-    def stop(self, wait: bool = False) -> Optional[Awaitable]:
-        ...
-
-    def stop(self, wait: bool = False) -> Coroutine[Any, Any, None] | None:  # type: ignore
-        self._alive = False
-        if wait:
-            return self.queue.join()
-
-    def put(self, item: _T) -> None:
-        if not self._alive:
-            raise RuntimeError("Can't put items into a Cascade that's not running.")
-        self.queue.put_nowait(item)
-
-    async def _loop(self) -> None:
-        try:
-            while self._alive:
-                queue_items: Sequence[_T] = []
-                iter_start: float = time.monotonic()
-
-                while (this_max_wait := (time.monotonic() - iter_start)) < self.max_wait:
-                    try:
-                        n = await asyncio.wait_for(self.queue.get(), this_max_wait)
-                    except asyncio.TimeoutError:
-                        continue
-                    else:
-                        queue_items.append(n)
-                    if len(queue_items) >= self.max_quantity:
-                        break
-
-                    if not queue_items:
-                        continue
-
-                num_items: int = len(queue_items)
-
-                asyncio.create_task(self.callback(queue_items))  # type: ignore
-
-                for _ in range(num_items):
-                    self.queue.task_done()
-
-        except asyncio.CancelledError:
-            log.debug("Recieved cascade cancellation.")
-        finally:
-            f: asyncio.Task[None] = asyncio.create_task(self._finalize(), name="robolia.cascade.finalizer")
-            try:
-                await asyncio.wait_for(f, timeout=self.max_wait_finalize)
-            except asyncio.TimeoutError:
-                log.info("Max wait during cascade finalization occurred.")
-
-    async def _finalize(self) -> None:
-        self._alive = False
-        remaining_items: Sequence[_T] = []
-
-        while not self.queue.empty():
-            try:
-                ev = self.queue.get_nowait()
-            except asyncio.QueueEmpty:
-                # I should never hit this, asyncio queues know their size reliably
-                break
-
-            remaining_items.append(ev)
-
-        if not remaining_items:
-            return
-
-        num_remaining: int = len(remaining_items)
-        pending_futures = []
-
-        for chunk in (remaining_items[p : p + self.max_quantity] for p in range(0, num_remaining, self.max_quantity)):
-            fut = asyncio.create_task(self.callback(chunk), name="robolia.cascade.finalizing_task")  # type: ignore
-            pending_futures.append(fut)
-
-        gathered = asyncio.create_task(
-            asyncio.gather(*pending_futures),
-            name="robolia.cascade.finalizing_task",
-        )
-
-        try:
-            await asyncio.wait_for(gathered, timeout=self.max_wait_finalize)  # type: ignore
-        except asyncio.TimeoutError:
-            for task in pending_futures:
-                task.cancel()
-
-        for _ in range(num_remaining):
-            self.queue.task_done()
 
 
 class AppInfoCache:

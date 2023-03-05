@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import itertools
-import re
-import os
-import aiohttp
-import pathlib
 import functools
+import itertools
+import os
+import pathlib
+import re
 from asyncio import AbstractEventLoop, to_thread
 from collections import defaultdict
 from logging import Logger, getLogger
@@ -20,19 +19,19 @@ from typing import (
     Iterator,
     Mapping,
     ParamSpec,
-    Iterator,
     Self,
     Type,
     TypeVar,
 )
 
+import aiohttp
 import asyncpg
 import discord
 from discord.ext import commands
 from redis.asyncio import Redis
 
-from utils import _RLC, RoboLiaContext
 from base import Gateway, PostgreSQLManager
+from utils import _RLC, RoboLiaContext
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -81,10 +80,7 @@ class RoboLia(commands.Bot):
                 852419718819348510,  # Lia Marie (https://github.com/qt-haskell)
                 546691865374752778,  # Utkarsh   (https://github.com/utkarshgupta2504)
             ],
-            description=(
-                "This is R. Lia, a personal-use Discord bot "
-                "that also happens to be open-source! 😸"
-            ),
+            description=("This is R. Lia, a personal-use Discord bot " "that also happens to be open-source! 😸"),
         )
 
         self.loop: AbstractEventLoop = loop
@@ -209,7 +205,7 @@ class RoboLia(commands.Bot):
 
     def exec(self, func: Callable[..., _T], *args, **kwargs) -> Awaitable[_T]:
         return self.loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
-    
+
     async def connect(self, *, reconnect: bool = True) -> None:
         backoff = discord.client.ExponentialBackoff()  # type: ignore
         ws_params: dict[str, Any] = {"initial": True, "shard_id": self.shard_id}
