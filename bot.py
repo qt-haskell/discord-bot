@@ -81,10 +81,7 @@ class RoboLia(commands.Bot):
                 852419718819348510,  # Lia Marie (https://github.com/qt-haskell)
                 546691865374752778,  # Utkarsh   (https://github.com/utkarshgupta2504)
             ],
-            description=(
-                "This is R. Lia, a personal-use Discord bot "
-                "that also happens to be open-source! 😸"
-            ),
+            description=("This is R. Lia, a personal-use Discord bot " "that also happens to be open-source! 😸"),
         )
 
         self.loop: AbstractEventLoop = loop
@@ -186,6 +183,11 @@ class RoboLia(commands.Bot):
     def get_schemas(self) -> Iterator[pathlib.Path]:
         root: pathlib.Path = pathlib.Path("schemas")
         for schema in itertools.chain((root / "prerequisites").glob("*.sql"), (root / "additional").glob("*.sql")):
+            # Ignore files that start with an underscore, as they are not meant to be loaded.
+            # Mainly used to refactor schemas or clean up old ones.
+            if schema.name.startswith("_"):
+                continue
+
             yield schema
 
     async def setup_hook(self) -> None:
@@ -201,6 +203,8 @@ class RoboLia(commands.Bot):
             except Exception as exc:
                 self.logger.exception(f"Failed to load schema {schema!r}", exc_info=exc)
 
+        await self.load_extension("jishaku")
+
     async def on_ready(self) -> None:
         self.logger.info("Connected to Discord.")
 
@@ -209,7 +213,7 @@ class RoboLia(commands.Bot):
 
     def exec(self, func: Callable[..., _T], *args, **kwargs) -> Awaitable[_T]:
         return self.loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
-    
+
     async def connect(self, *, reconnect: bool = True) -> None:
         backoff = discord.client.ExponentialBackoff()  # type: ignore
         ws_params: dict[str, Any] = {"initial": True, "shard_id": self.shard_id}
