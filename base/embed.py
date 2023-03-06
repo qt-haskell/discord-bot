@@ -18,13 +18,12 @@ class EmbedBuilder(Embed):
         *,
         colour: Optional[Colour | int] = Constants.EMBED_COLOUR,
         timestamp: Optional[datetime] = None,
-        fields: Optional[Iterable[tuple[str, str, bool]]] = None,
+        fields: Iterable[tuple[str, str, bool]] = (),
         **kwargs: Any,
     ) -> None:
         super().__init__(colour=colour, timestamp=timestamp, **kwargs)
-        if fields:
-            for name, value, inline in fields:
-                self.add_field(name=name, value=value, inline=inline)
+        for name, value, inline in fields:
+            self.add_field(name=name, value=value, inline=inline)
 
     @classmethod
     def _restore_factory(cls: Type[Self], embed: Embed, **kwargs: Any) -> Self:
@@ -41,7 +40,7 @@ class EmbedBuilder(Embed):
         cls: Type[Self],
         message: Message,
         *,
-        fields: Optional[Iterable[tuple[str, str, bool]]] = None,
+        fields: Iterable[tuple[str, str, bool]] = (),
         **kwargs: Any,
     ) -> Self:
         if embeds := message.embeds:

@@ -182,6 +182,11 @@ class RoboLia(commands.Bot):
     def get_schemas(self) -> Iterator[pathlib.Path]:
         root: pathlib.Path = pathlib.Path("schemas")
         for schema in itertools.chain((root / "prerequisites").glob("*.sql"), (root / "additional").glob("*.sql")):
+            # Ignore files that start with an underscore, as they are not meant to be loaded.
+            # Mainly used to refactor schemas or clean up old ones.
+            if schema.name.startswith("_"):
+                continue
+
             yield schema
 
     async def setup_hook(self) -> None:
@@ -196,6 +201,8 @@ class RoboLia(commands.Bot):
                 await self.pool.execute(schema.read_text())
             except Exception as exc:
                 self.logger.exception(f"Failed to load schema {schema!r}", exc_info=exc)
+
+        await self.load_extension("jishaku")
 
     async def on_ready(self) -> None:
         self.logger.info("Connected to Discord.")
