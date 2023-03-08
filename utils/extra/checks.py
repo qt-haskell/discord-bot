@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from discord.ext import commands
 
-from utils import RoboLiaContext
+from utils import LiaContext
 
 __all__: tuple[str, ...] = (
     "creator_in_guild",
@@ -11,7 +11,7 @@ __all__: tuple[str, ...] = (
 
 
 def creator_in_guild():
-    async def predicate(ctx: RoboLiaContext) -> bool:
+    async def predicate(ctx: LiaContext) -> bool:
         if ctx.guild:
             return await ctx.bot.is_owner(ctx.author)
         return False
@@ -20,7 +20,7 @@ def creator_in_guild():
 
 
 def is_guild_owner():
-    async def predicate(ctx: RoboLiaContext) -> bool:
+    async def predicate(ctx: LiaContext) -> bool:
         return ctx.author == ctx.guild.owner
 
     return commands.check(predicate)

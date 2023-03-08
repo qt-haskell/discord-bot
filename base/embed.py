@@ -8,6 +8,7 @@ from .config import Constants
 
 if TYPE_CHECKING:
     from datetime import datetime
+    from utils import LiaContext
 
 __all__: tuple[str, ...] = ("EmbedBuilder",)
 
@@ -65,3 +66,7 @@ class EmbedBuilder(Embed):
             instance.set_footer(text=footer)
 
         return instance
+    
+    @classmethod
+    def factory(cls, ctx: LiaContext, **kwargs: Any) -> Embed:
+        return cls(**kwargs).set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.display_avatar)

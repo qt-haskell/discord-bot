@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import asyncio
-import functools
 import itertools
 import os
 import pathlib
 import re
+from contextlib import asynccontextmanager
 from asyncio import AbstractEventLoop, to_thread
 from collections import defaultdict
 from logging import Logger, getLogger
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
+    AsyncGenerator,
     Callable,
     DefaultDict,
     Iterable,
@@ -31,13 +31,14 @@ from discord.ext import commands
 from redis.asyncio import Redis
 
 from base import Gateway, PostgreSQLManager
-from utils import _RLC, RoboLiaContext
+from utils import _RLC, LiaContext
 
 if TYPE_CHECKING:
     from datetime import datetime
 
     from aiohttp import ClientSession
     from asyncpg import Connection, Pool, Record
+    from asyncpg.pool import PoolConnectionProxy
 
 
 _RLT = TypeVar("_RLT", bound="RoboLia")
@@ -88,6 +89,7 @@ class RoboLia(commands.Bot):
         self.pool: Pool[Record] = pool
         self.redis: Redis = redis
 
+        self.safe_connection: PostgreSQLManager = PostgreSQLManager(self.pool)
         self.cached_prefixes: DefaultDict[int, list[re.Pattern[str]]] = defaultdict(list)
 
     @discord.utils.cached_property
@@ -126,10 +128,14 @@ class RoboLia(commands.Bot):
         except Exception as exc:
             raise
 
+    #async def connection(self, *, timeout: float = 10.0) -> AsyncGenerator[PoolConnectionProxy[Record], None]:
+    #    async with PostgreSQLManager(self.pool, timeout=timeout).acquire_connection() as conn:
+    #        yield conn
+
     async def get_prefix(self, message: discord.Message) -> list[str] | str:
         return commands.when_mentioned_or(*("pls", "pls "))(self, message)
 
-    async def get_context(self, message: discord.Message, *, cls: Type[_RLC] = RoboLiaContext) -> RoboLiaContext:
+    async def get_context(self, message: discord.Message, *, cls: Type[_RLC] = LiaContext) -> LiaContext:
         return await super().get_context(message, cls=cls or commands.Context[_RLT])
 
     async def process_commands(self, message: discord.Message, /) -> None:
@@ -138,7 +144,7 @@ class RoboLia(commands.Bot):
         except asyncio.TimeoutError:
             return
 
-        ctx: RoboLiaContext = await self.get_context(message, cls=RoboLiaContext)
+        ctx: LiaContext = await self.get_context(message, cls=LiaContext)
         if ctx.command is None:
             return
 
@@ -166,7 +172,7 @@ class RoboLia(commands.Bot):
 
         await super().close()
 
-    async def wrap(self, func: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> _T:
+    async def exec(self, func: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> _T:
         return await to_thread(func, *args, **kwargs)
 
     def chunk(self, iterable: Iterable[_T], size: int) -> Iterator[list[_T]]:
@@ -209,9 +215,6 @@ class RoboLia(commands.Bot):
 
         if getattr(self, "timestamp", None) is None:
             self.timestamp = discord.utils.utcnow()
-
-    def exec(self, func: Callable[..., _T], *args, **kwargs) -> Awaitable[_T]:
-        return self.loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
 
     async def connect(self, *, reconnect: bool = True) -> None:
         backoff = discord.client.ExponentialBackoff()  # type: ignore
@@ -271,5 +274,3 @@ class RoboLia(commands.Bot):
                 await asyncio.sleep(retry)
                 ws_params.update(sequence=self.ws.sequence, resume=True, session=self.ws.session_id)
 
-    async def connection(self, *, timeout: float = 10.0) -> PostgreSQLManager:
-        return PostgreSQLManager(self.pool, timeout=timeout)

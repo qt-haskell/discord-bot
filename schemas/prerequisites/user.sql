@@ -9,10 +9,16 @@ CREATE TABLE IF NOT EXISTS presence_history (
   uid BIGINT NOT NULL,
   status TEXT NOT NULL,
   changed_at TIMESTAMP WITH TIME ZONE DEFAULT (now() AT TIME ZONE 'UTC') NOT NULL,
-  CONSTRAINT presence_history_uid_fk FOREIGN KEY (uid) REFERENCES users(uid) ON DELETE CASCADE,
-  CONSTRAINT presence_history_status_check CHECK (status IN ('Online', 'Idle', 'DND', 'Offline'))
+  CONSTRAINT presence_history_uid_fk FOREIGN KEY (uid) REFERENCES users(uid) ON DELETE CASCADE
 );
 
+CREATE OR REPLACE FUNCTION insert_into_presence_history(p_user_id bigint, p_status text)
+RETURNS void AS $$
+BEGIN
+  INSERT INTO users (uid) VALUES (p_user_id) ON CONFLICT DO NOTHING;
+  INSERT INTO presence_history (uid, status) VALUES (p_user_id, p_status);
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS owo_counting (
   id BIGSERIAL PRIMARY KEY NOT NULL,
@@ -33,7 +39,6 @@ CREATE TABLE IF NOT EXISTS item_history (
     CONSTRAINT item_history_item_type_check CHECK (item_type IN ('avatar', 'discriminator', 'name'))
 );
 
-
 CREATE TABLE IF NOT EXISTS avatar_history (
     id BIGSERIAL PRIMARY KEY NOT NULL,
     uid BIGINT NOT NULL,
@@ -42,7 +47,6 @@ CREATE TABLE IF NOT EXISTS avatar_history (
     changed_at TIMESTAMP WITH TIME ZONE DEFAULT (now() AT TIME ZONE 'UTC') NOT NULL,
     CONSTRAINT avatar_history_uid_fk FOREIGN KEY (uid) REFERENCES users(uid) ON DELETE CASCADE
 );
-
 
 CREATE OR REPLACE FUNCTION get_score_counts(p_uid BIGINT) RETURNS TABLE (
   daily_score INTEGER,
@@ -87,7 +91,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
 CREATE OR REPLACE FUNCTION insert_avatar_history_item(p_user_id bigint, p_format text, p_avatar bytea)
 RETURNS void AS $$
 BEGIN
@@ -102,43 +105,5 @@ BEGIN
     ) THEN
         INSERT INTO avatar_history (uid, format, avatar) VALUES (p_user_id, p_format, p_avatar);
     END IF;
-END;
-$$ LANGUAGE plpgsql;
-
-
-CREATE OR REPLACE FUNCTION get_total_seconds(user_id BIGINT, days INTEGER DEFAULT NULL)
-RETURNS TABLE (
-  status TEXT,
-  total_seconds BIGINT
-) AS $$
-DECLARE
-  accumulated_seconds BIGINT;
-  start_date TIMESTAMP;
-BEGIN
-    accumulated_seconds := 0;
-    IF days IS NOT NULL THEN
-        start_date := now() - INTERVAL '1 DAY' * days;
-    ELSE
-        start_date := NULL;
-    END IF;
-    RETURN QUERY
-    SELECT 
-        sc.status,
-        CAST(SUM(EXTRACT(EPOCH FROM (COALESCE(sc.next_changed_at, now()) - sc.changed_at))) AS BIGINT) AS total_seconds
-    FROM (
-        SELECT 
-        sh.status,
-        sh.changed_at,
-        LEAD(sh.changed_at) OVER (
-            PARTITION BY sh.id 
-            ORDER BY sh.changed_at 
-            ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
-        ) AS next_changed_at
-        FROM presence_history sh
-        WHERE sh.id = user_id
-        AND (start_date IS NULL OR sh.changed_at >= start_date)
-    ) sc
-    GROUP BY sc.status
-    ORDER BY MIN(sc.changed_at);
 END;
 $$ LANGUAGE plpgsql;

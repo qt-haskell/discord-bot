@@ -17,14 +17,14 @@ if TYPE_CHECKING:
     from bot import RoboLia
 
 
-__all__: tuple[str, ...] = ("RoboLiaContext", "_RLC")
+__all__: tuple[str, ...] = ("LiaContext", "_RLC")
 
 
 log: logging.Logger = logging.getLogger(__name__)
-_RLC = TypeVar("_RLC", bound="RoboLiaContext")
+_RLC = TypeVar("_RLC", bound="LiaContext")
 
 
-class RoboLiaContext(commands.Context["RoboLia"]):
+class LiaContext(commands.Context["RoboLia"]):
     if TYPE_CHECKING:
         bot: RoboLia
         message: discord.Message
