@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, ClassVar
 import discord
 from discord.ext import commands
 
-from .base import BaseEventCog
-
 if TYPE_CHECKING:
     from discord import Member
+
+    from bot import RoboLia
 
 __all__: tuple[str, ...] = ("Statistics",)
 
@@ -17,7 +17,10 @@ __all__: tuple[str, ...] = ("Statistics",)
 log: Logger = getLogger(__name__)
 
 
-class Statistics(BaseEventCog):
+class Statistics(commands.Cog):
+
+    def __init__(self, bot: RoboLia) -> None:
+        self.bot: RoboLia = bot
 
     __presence_map: ClassVar[dict[discord.Status, str]] = {
         discord.Status.online: "Online",
